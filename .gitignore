@@ -1,0 +1,27 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+playwright-results/
+.madar/
+
+ios/App/App/public/
+ios/App/App/capacitor.config.json
+ios/App/Pods/
+ios/**/xcuserdata/
+
+# Personal course documents stay out of source control.
+public/personal-lessons/
+
+.leader-data/
+
+# Python backend caches and local credentials.
+__pycache__/
+*.py[cod]
+.venv/
+python_backend/service-account*.json
+
+# Shared PDFs are reconstructed from verified source parts during build.
+public/course-library/
