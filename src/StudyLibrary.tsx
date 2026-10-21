@@ -1,0 +1,17 @@
+import { useApp } from './store';
+import { LOGISTICS_LESSONS } from './logisticsContent';
+
+interface Lesson { id: string; title: string; content: string; summary: string; sourceUrl?: string; }
+export default function StudyLibrary() {
+  const { update, notify } = useApp();
+  const lessons: Lesson[] = LOGISTICS_LESSONS.map(lesson => ({ ...lesson, content: lesson.summary }));
+  function add() {
+    update(d => {
+      const courseId = d.courses.find(c => c.name === 'إدارة المخزون والمخازن')?.id ?? 'inventory-course-103';
+      if (!d.courses.some(c => c.id === courseId)) d.courses.push({ id: courseId, name: 'إدارة المخزون والمخازن', color: '#7567dd' });
+      for (const lesson of lessons) if (!d.notes.some(n => n.id === lesson.id)) d.notes.push({ id: lesson.id, title: lesson.title, courseId, content: lesson.content, summary: lesson.summary, updatedAt: new Date().toISOString() });
+    });
+    notify('أُضيفت المحاضرات إلى ملاحظاتك. الملاحظات الموجودة بقيت محفوظة.');
+  }
+  return <section className="card stack"><h2>المحاضرات الخمس: إدارة المخزون والمخازن</h2><p>ملخصات المحاضرات المتاحة في المشروع لجميع المستخدمين المسجلين.</p><button className="btn btn-primary" onClick={add}>إضافة المحاضرات الخمس إلى ملاحظاتي</button>{lessons.map(lesson => <details key={lesson.id}><summary>{lesson.title}</summary><p className="preserve-lines">{lesson.summary}</p>{lesson.sourceUrl && <a href={lesson.sourceUrl} target="_blank" rel="noopener noreferrer">فتح ملف المحاضرة الأصلي</a>}</details>)}</section>;
+}
