@@ -1,0 +1,28 @@
+{
+  "name": "madar-student-planner",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24.0.0" },
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc -b && vite build",
+    "preview": "node --experimental-strip-types server/index.mjs",
+    "start": "node --experimental-strip-types server/index.mjs",
+    "owner:init": "node --experimental-strip-types server/initialize-owner.mjs",
+    "test": "node --experimental-strip-types --test tests/*.test.ts tests/*.test.mjs",
+    "test:browser": "python3 tests/browser_smoke.py"
+  },
+  "dependencies": {
+    "lucide-react": "1.55.0",
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "@vitejs/plugin-react": "5.1.4",
+    "typescript": "5.9.3",
+    "vite": "7.3.1"
+  }
+}
