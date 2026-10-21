@@ -1,0 +1,54 @@
+import type { AppData, ImportedQuiz } from "./types.ts";
+import { validateExtensions } from './dataExtensions.ts';
+export const STORAGE_KEY = 'madar.student.v1';
+export function validUniversityUrl(value: string) {
+  if (!value) return true;
+  try { const url = new URL(value); return url.protocol === 'https:' && !url.username && !url.password; } catch { return false; }
+}
+export const emptyData = (): AppData => ({
+  version: 1, incomeRules: [], universityEvents: [], courses: [], lectures: [], tasks: [], notes: [], transactions: [],
+  settings: { name: '', currency: 'SAR', monthlyBudget: 0, dailyMinutes: 90, studyStart: '18:00', studyDays: [0, 1, 2, 3, 4, 6], universityName: 'الجامعة السعودية الإلكترونية', universityUrl: 'https://lms.ac-seu.com/login/index.php?loginredirect=1' },
+});
+
+const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
+const textValue = (x: unknown) => typeof x === 'string' && x.length <= 200000;
+const validDate = (x: unknown) => {
+  if (typeof x !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(x)) return false;
+  const d = new Date(x + 'T12:00:00');
+  return !Number.isNaN(d.getTime()) && `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` === x;
+};
+const validTime = (x: unknown) => typeof x === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(x);
+const boundedNumber = (x: unknown, min: number, max: number) => typeof x === 'number' && Number.isFinite(x) && x >= min && x <= max;
+
+export function validImportedQuiz(q:unknown):q is ImportedQuiz {
+ const object=(v:unknown):v is Record<string,unknown>=>!!v&&typeof v==='object'&&!Array.isArray(v);
+ const text=(v:unknown,max=200000)=>typeof v==='string'&&!!v.trim()&&v.length<=max;
+ return object(q)&&text(q.id,149)&&text(q.title,200)&&Array.isArray(q.questions)&&q.questions.length>0&&q.questions.length<=200&&new Set(q.questions.map(x=>object(x)?x.id:null)).size===q.questions.length&&q.questions.every(x=>object(x)&&text(x.id,149)&&text(x.question,5000)&&Array.isArray(x.options)&&x.options.length>=2&&x.options.length<=8&&x.options.every(o=>text(o,2000))&&Number.isInteger(x.correct)&&Number(x.correct)>=0&&Number(x.correct)<x.options.length);
+}
+
+export function validateData(value: unknown): value is AppData {
+  if (!isObject(value) || value.version !== 1 || !isObject(value.settings) || (value.demo !== undefined && typeof value.demo !== 'boolean') || (value.profile !== undefined && typeof value.profile !== 'boolean')) return false;
+  if(value.quizzes!==undefined&&(!Array.isArray(value.quizzes)||value.quizzes.length>20||!value.quizzes.every(validImportedQuiz)||new Set(value.quizzes.map(q=>q.id)).size!==value.quizzes.length))return false;
+  if (!validateExtensions(value)) return false;
+  const s = value.settings;
+  if (value.projectGroups !== undefined && (!Array.isArray(value.projectGroups) || value.projectGroups.length > 1000 || !value.projectGroups.every(g => isObject(g) && typeof g.id === 'string' && g.id.length > 0 && g.id.length < 150 && textValue(g.name) && textValue(g.notes) && Array.isArray(g.members) && g.members.length <= 9 && g.members.every(textValue)) || new Set(value.projectGroups.map(g => g.id)).size !== value.projectGroups.length)) return false;
+  if ((s.universityName !== undefined && !textValue(s.universityName)) || (s.universityUrl !== undefined && (typeof s.universityUrl !== 'string' || !validUniversityUrl(s.universityUrl)))) return false;
+  if (!textValue(s.name) || typeof s.currency !== 'string' || !['SAR', 'AED', 'KWD', 'USD', 'EUR', 'EGP', 'QAR', 'BHD', 'OMR'].includes(s.currency) || !boundedNumber(s.monthlyBudget, 0, 1e9) || !boundedNumber(s.dailyMinutes, 0, 720) || !validTime(s.studyStart) || !Array.isArray(s.studyDays) || !s.studyDays.every(d => Number.isInteger(d) && d >= 0 && d <= 6) || new Set(s.studyDays).size !== s.studyDays.length) return false;
+  for (const key of ['courses', 'lectures', 'tasks', 'notes', 'transactions']) {
+    const rows = value[key];
+    if (!Array.isArray(rows) || rows.length > 10000 || !rows.every(x => isObject(x) && typeof x.id === 'string' && x.id.length > 0 && x.id.length < 150) || new Set(rows.map(x => x.id)).size !== rows.length) return false;
+  }
+  if (!(value.courses as Record<string, unknown>[]).every(c => c.resources === undefined || (Array.isArray(c.resources) && c.resources.length <= 1000 && c.resources.every(r => isObject(r) && textValue(r.id) && textValue(r.title) && textValue(r.kind) && textValue(r.section) && typeof r.url === 'string' && !!r.url && validUniversityUrl(r.url))))) return false;
+  const courses = value.courses as Record<string, unknown>[];
+  const courseIds = new Set(courses.map(c => c.id));
+  const courseRef = (id: unknown) => id === '' || courseIds.has(id);
+  const optionalTime = (x: unknown) => x === undefined || x === '' || validTime(x);
+  if (value.incomeRules !== undefined && (!Array.isArray(value.incomeRules) || value.incomeRules.length > 1000 || new Set(value.incomeRules.map(r => r?.id)).size !== value.incomeRules.length || !value.incomeRules.every(r => isObject(r) && textValue(r.id) && textValue(r.title) && textValue(r.category) && boundedNumber(r.amount, 0.01, 1e9) && (r.day === null || (Number.isInteger(r.day) && boundedNumber(r.day, 1, 31)))))) return false;
+  if (value.universityEvents !== undefined && (!Array.isArray(value.universityEvents) || value.universityEvents.length > 10000 || new Set(value.universityEvents.map(e => e?.id)).size !== value.universityEvents.length || !value.universityEvents.every(e => isObject(e) && textValue(e.id) && textValue(e.title) && validDate(e.date) && optionalTime(e.time) && (e.endDate === undefined || validDate(e.endDate)) && optionalTime(e.endTime) && ['lecture','assignment','exam','event'].includes(e.kind as string) && textValue(e.description) && (e.url === undefined || (typeof e.url === 'string' && validUniversityUrl(e.url))) && (e.courseId === undefined || textValue(e.courseId))))) return false;
+  return courses.every(c => textValue(c.name) && typeof c.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(c.color) && (c.code === undefined || textValue(c.code))) &&
+    (value.lectures as Record<string, unknown>[]).every(l => courseIds.has(l.courseId) && Number.isInteger(l.day) && boundedNumber(l.day, 0, 6) && optionalTime(l.start) && optionalTime(l.end) && (!l.end || (!!l.start && (l.end as string) > (l.start as string))) && textValue(l.location) && (l.attendanceUrl === undefined || (typeof l.attendanceUrl === 'string' && validUniversityUrl(l.attendanceUrl))) && (l.fileUrl === undefined || (typeof l.fileUrl === 'string' && validUniversityUrl(l.fileUrl))) && (l.timePending === undefined || textValue(l.timePending))) &&
+    (value.tasks as Record<string, unknown>[]).every(t => textValue(t.title) && courseRef(t.courseId) && ['assignment', 'project', 'exam'].includes(t.kind as string) && validDate(t.due) && ['low', 'medium', 'high'].includes(t.priority as string) && boundedNumber(t.minutes, 0, 100000) && typeof t.completed === 'boolean' && optionalTime(t.time) && optionalTime(t.endTime) && (!t.endTime || (!!t.time && (t.endTime as string) > (t.time as string))) && (t.timePending === undefined || textValue(t.timePending))) &&
+    (value.notes as Record<string, unknown>[]).every(n => textValue(n.title) && courseRef(n.courseId) && textValue(n.content) && textValue(n.summary) && typeof n.updatedAt === 'string' && !Number.isNaN(Date.parse(n.updatedAt))) &&
+    (value.transactions as Record<string, unknown>[]).every(t => textValue(t.title) && ['expense', 'income'].includes(t.kind as string) && boundedNumber(t.amount, 0.01, 1e9) && textValue(t.category) && validDate(t.date) && (t.ruleId === undefined || textValue(t.ruleId)));
+}
+
